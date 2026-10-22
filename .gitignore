@@ -1,0 +1,10 @@
+__pycache__/
+*.pt
+*.faiss
+*.parquet
+abo/
+data/
+runs/
+artifacts/
+.cache/
+.serena
