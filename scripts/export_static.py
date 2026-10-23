@@ -68,12 +68,18 @@ def onnx_export(module, example, path, input_name):
 QUANT_CONFIGS = [
     dict(per_channel=False, op_types_to_quantize=["MatMul", "Gemm", "Gather"]),
     dict(per_channel=True, op_types_to_quantize=["MatMul", "Gemm", "Gather"]),
-    dict(per_channel=True, op_types_to_quantize=["MatMul", "Gemm"]),
+    # The fine-tuned text tower's first block has activation outliers; keeping it in fp32 costs ~9 MB.
+    dict(per_channel=True, op_types_to_quantize=["MatMul", "Gemm", "Gather"], keep_fp32="transformer/resblocks.0/"),
 ]
 
 
 def quantize(src, dst, config):
+    import onnx
     from onnxruntime.quantization import QuantType, quantize_dynamic
+    config = dict(config)
+    keep = config.pop("keep_fp32", None)
+    if keep:
+        config["nodes_to_exclude"] = [n.name for n in onnx.load(src).graph.node if keep in n.name]
     quantize_dynamic(src, dst, weight_type=QuantType.QInt8, **config)
 
 
@@ -126,14 +132,14 @@ def export_tokenizer(tokenizer, out):
     for tok, i in tokenizer.encoder.items():
         vocab[i] = tok
     merges = [" ".join(p) for p, _ in sorted(tokenizer.bpe_ranks.items(), key=lambda kv: kv[1])]
-    with open(os.path.join(out, "model", "tokenizer.json"), "w") as f:
+    with open(os.path.join(out, "model", "tokenizer.json"), "w", encoding="utf-8") as f:
         json.dump({"vocab": vocab, "merges": merges, "sot": tokenizer.sot_token_id, "eot": tokenizer.eot_token_id,
                    "context_length": tokenizer.context_length,
                    "byte_encoder": {str(k): v for k, v in tokenizer.byte_encoder.items()}}, f, ensure_ascii=False)
     # test strings for checking the JavaScript tokenizer against this one
     samples = ["Red running shoes!", "wooden coffee-table, 3 drawers", "iPhone 15 case (black)", "café crème 100ml",
                "kids' toys & games", "  lots   of   spaces  ", "USB-C to HDMI 4K@60Hz adapter"]
-    with open(os.path.join(out, "model", "tokenizer_tests.json"), "w") as f:
+    with open(os.path.join(out, "model", "tokenizer_tests.json"), "w", encoding="utf-8") as f:
         json.dump([{"text": s, "ids": tokenizer([s])[0].tolist()} for s in samples], f)
 
 
@@ -212,13 +218,13 @@ def export_meta(meta, out):
     os.makedirs(os.path.join(out, "meta"), exist_ok=True)
     for s in range(0, len(meta), SHARD):
         rows = [[p] + describe(t) for p, t in zip(meta.image_path.iloc[s:s + SHARD], meta.text.iloc[s:s + SHARD])]
-        with open(os.path.join(out, "meta", f"{s // SHARD:03d}.json"), "w") as f:
+        with open(os.path.join(out, "meta", f"{s // SHARD:03d}.json"), "w", encoding="utf-8") as f:
             json.dump(rows, f, ensure_ascii=False, separators=(",", ":"))
 
 
 def push(out, user):
     from huggingface_hub import HfApi
-    api = HfApi(token=os.environ["HF_TOKEN"])
+    api = HfApi(token=os.environ.get("HF_TOKEN"))  # None falls back to the token saved by `hf auth login`
     model_repo, space = f"{user}/ProductLens-onnx", f"{user}/ProductLens"
     api.create_repo(model_repo, repo_type="model", exist_ok=True)
     api.upload_folder(folder_path=os.path.join(out, "model"), repo_id=model_repo, repo_type="model",
@@ -267,11 +273,12 @@ def main():
             "mean": [float(x) for x in norm.mean], "std": [float(x) for x in norm.std]}
     info = {"index": idx, "encoders": enc, "preprocess": prep, "shard": SHARD, "model_base": model_base, "github": args.github,
             "image_base": "https://amazon-berkeley-objects.s3.amazonaws.com/images/small/"}
-    with open(os.path.join(args.out, "index", "info.json"), "w") as f:
+    with open(os.path.join(args.out, "index", "info.json"), "w", encoding="utf-8") as f:
         json.dump(info, f, indent=1)
     site = os.path.join(HERE, "..", "static")
     for fn in ("index.html", "README.md"):
         shutil.copy(os.path.join(site, fn), os.path.join(args.out, fn))
+    shutil.copytree(os.path.join(site, "samples"), os.path.join(args.out, "samples"))
     print(json.dumps({"index_mb": round(idx["bytes"] / 2**20, 1), **enc}, indent=1))
     if args.push:
         push(args.out, args.push)

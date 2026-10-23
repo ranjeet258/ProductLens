@@ -1,0 +1,8 @@
+{
+  "queries": 6077,
+  "failures": 4364,
+  "failures_with_correct_in_top10": 0.6137,
+  "failures_near_duplicate_text_gt_0.6": 0.736,
+  "failures_text_similarity_median": 0.8385,
+  "failures_identical_name": 0.0442
+}

@@ -1,0 +1,22 @@
+{
+  "cosine_min": 0.982365608215332,
+  "cosine_mean": 0.997380793094635,
+  "rows": [
+    {
+      "encoder": "PyTorch fp32",
+      "size_mb": 242.4,
+      "ms_per_query_1thread": 125.5,
+      "R@1": 28.19,
+      "R@5": 58.35,
+      "R@10": 72.26
+    },
+    {
+      "encoder": "ONNX INT8 (browser)",
+      "size_mb": 69.9,
+      "ms_per_query_1thread": 44.6,
+      "R@1": 27.51,
+      "R@5": 57.99,
+      "R@10": 71.98
+    }
+  ]
+}

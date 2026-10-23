@@ -8,3 +8,7 @@ runs/
 artifacts/
 .cache/
 .serena
+static_site/
+kaggle_output/
+.ipynb_checkpoints/
+ProductLens_Technical_Report.pdf

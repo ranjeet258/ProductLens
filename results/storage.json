@@ -1,0 +1,38 @@
+[
+  {
+    "component": "Catalog vectors, float32 (exact)",
+    "mb": 237.4
+  },
+  {
+    "component": "Catalog vectors, float16",
+    "mb": 118.7
+  },
+  {
+    "component": "FAISS IVF-PQ index (API)",
+    "mb": 7.1
+  },
+  {
+    "component": "Browser index arrays",
+    "mb": 6.4
+  },
+  {
+    "component": "Browser product metadata shards",
+    "mb": 18.3
+  },
+  {
+    "component": "Text encoder, fp32 ONNX",
+    "mb": 242.4
+  },
+  {
+    "component": "Text encoder, INT8 ONNX (browser)",
+    "mb": 69.9
+  },
+  {
+    "component": "Image encoder, fp32 ONNX",
+    "mb": 335.3
+  },
+  {
+    "component": "Image encoder, INT8 ONNX (browser, lazy)",
+    "mb": 91.3
+  }
+]

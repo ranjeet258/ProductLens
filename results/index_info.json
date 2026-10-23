@@ -1,0 +1,7 @@
+{
+  "n_items": 121549,
+  "dim": 512,
+  "index": "IndexIVFPQ",
+  "embed_images_per_sec": 671.3,
+  "model": "ViT-B-32"
+}

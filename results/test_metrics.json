@@ -1,0 +1,20 @@
+{
+  "zero_shot": {
+    "text2image_R@1": 41.57,
+    "text2image_R@5": 65.81,
+    "text2image_R@10": 74.2,
+    "image2text_R@1": 48.66,
+    "image2text_R@5": 73.47,
+    "image2text_R@10": 80.86,
+    "mean_recall": 64.09
+  },
+  "fine_tuned": {
+    "text2image_R@1": 84.27,
+    "text2image_R@5": 96.73,
+    "text2image_R@10": 98.19,
+    "image2text_R@1": 83.79,
+    "image2text_R@5": 96.48,
+    "image2text_R@10": 98.16,
+    "mean_recall": 92.94
+  }
+}

@@ -3,213 +3,326 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ProductLens — CLIP in your browser</title>
-<meta name="description" content="Search 121,549 Amazon products by describing them or by showing a photo. Fine-tuned CLIP embeddings with a FAISS index.">
+<title>ProductLens — visual product search in your browser</title>
+<meta name="description" content="Search 121,549 Amazon products by describing them or by showing a photo. Fine-tuned CLIP embeddings with a FAISS index, running entirely in your browser.">
+<meta name="theme-color" content="#F7F8FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0A0D14" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --page:#EEF2F0; --surface:#FFFFFF; --ink:#0E3B43; --muted:#5B6B6E; --line:#D3DCD9;
-  --accent:#F2A93B; --accent-ink:#5A3A00; --photo:#FFFFFF; --danger:#B3261E;
-  --display:"Bricolage Grotesque", "Trebuchet MS", sans-serif;
-  --body:"Instrument Sans", system-ui, sans-serif;
+  --bg:#F7F8FA; --surface:#FFFFFF; --raised:#FFFFFF; --ink:#0B1220; --ink2:#344054; --muted:#667085; --line:#E4E7EC;
+  --accent:#4F46E5; --accent-hover:#4338CA; --accent-soft:#EEF0FF; --accent-ink:#FFFFFF; --ok:#12A150; --danger:#D92D20;
+  --photo:#FFFFFF; --shadow:0 1px 2px rgba(16,24,40,.05); --shadow-lg:0 12px 32px -8px rgba(16,24,40,.14),0 4px 8px -4px rgba(16,24,40,.06);
+  --head:"Inter Tight","Inter",system-ui,sans-serif; --body:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:14px;
 }
 @media (prefers-color-scheme: dark){
-  :root{ --page:#0F1E21; --surface:#16292D; --ink:#E6EEEC; --muted:#9DB0AE; --line:#2A4247;
-         --accent:#F2A93B; --accent-ink:#2B1B00; --photo:#F4F6F5; --danger:#F2B8B5; }
+  :root{ --bg:#0A0D14; --surface:#111622; --raised:#161C2A; --ink:#EEF1F6; --ink2:#C9D0DC; --muted:#98A2B3; --line:#232A38;
+         --accent:#818CF8; --accent-hover:#A5B4FC; --accent-soft:#1C2140; --accent-ink:#0A0D14; --ok:#47CD89; --danger:#F97066;
+         --photo:#F4F5F7; --shadow:0 1px 2px rgba(0,0,0,.3); --shadow-lg:0 16px 40px -12px rgba(0,0,0,.6); }
 }
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--page);color:var(--ink);font:400 16px/1.55 var(--body)}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.6 var(--body);-webkit-font-smoothing:antialiased}
 a{color:inherit}
-:focus-visible{outline:3px solid var(--accent);outline-offset:2px;border-radius:6px}
-.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+svg{flex:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:8px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
-/* masthead */
-.top{display:flex;justify-content:space-between;align-items:center;padding:18px 0}
-.mark{font:700 18px/1 var(--display);letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
-.mark i{width:22px;height:22px;border-radius:6px;background:var(--ink);display:inline-grid;place-items:center}
-.mark i::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent)}
-.top nav{display:flex;gap:18px;font-size:15px}
-.top nav a{color:var(--muted);text-decoration:none}
-.top nav a:hover{color:var(--ink);text-decoration:underline}
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--bg) 82%,transparent);
+  backdrop-filter:saturate(1.6) blur(12px);-webkit-backdrop-filter:saturate(1.6) blur(12px);border-bottom:1px solid var(--line)}
+.top .wrap{display:flex;justify-content:space-between;align-items:center;height:60px}
+.mark{display:flex;align-items:center;gap:10px;font:700 17px/1 var(--head);letter-spacing:-.02em;text-decoration:none}
+.mark .logo{width:28px;height:28px;border-radius:8px;background:linear-gradient(135deg,var(--accent),#7C3AED);display:grid;place-items:center;color:#fff}
+.top nav{display:flex;align-items:center;gap:4px;font-size:14px;font-weight:500}
+.top nav a{color:var(--muted);text-decoration:none;padding:7px 12px;border-radius:8px;display:flex;align-items:center;gap:6px}
+.top nav a:hover{color:var(--ink);background:var(--surface)}
+.top nav a.gh{color:var(--ink);border:1px solid var(--line);background:var(--surface);margin-left:6px}
 
-/* the query is the hero */
-.hero{padding:36px 0 10px}
-.hero p.lede{margin:0 0 18px;color:var(--muted);max-width:60ch}
-.modes{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;margin-bottom:14px}
-.modes button{border:0;background:none;color:var(--muted);font:500 15px var(--body);padding:8px 16px;border-radius:999px;cursor:pointer}
-.modes button[aria-pressed="true"]{background:var(--ink);color:var(--page)}
-form.q{display:flex;align-items:flex-end;gap:14px;border-bottom:3px solid var(--ink);padding-bottom:6px}
-form.q input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);
-  font:700 clamp(30px,5.2vw,58px)/1.1 var(--display);letter-spacing:-.025em;padding:4px 0}
-form.q input::placeholder{color:var(--muted);opacity:.55}
+/* hero */
+.hero{text-align:center;padding:64px 0 28px;position:relative}
+.hero::before{content:"";position:absolute;inset:-60px 0 auto;height:420px;z-index:-1;pointer-events:none;
+  background:radial-gradient(600px 260px at 50% 30%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 70%)}
+.badge{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--ink2);
+  background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 6px;box-shadow:var(--shadow)}
+.badge b{white-space:nowrap;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:1px 8px;font-weight:600;font-size:12px}
+.hero h1{font:700 clamp(34px,5.4vw,60px)/1.05 var(--head);letter-spacing:-.035em;margin:20px auto 16px;max-width:16ch}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,var(--accent),#7C3AED);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lede{margin:0 auto 32px;color:var(--muted);font-size:17px;max-width:58ch}
+
+/* search box */
+.searchbox{max-width:760px;margin:0 auto;background:var(--raised);border:1px solid var(--line);border-radius:20px;
+  box-shadow:var(--shadow-lg);padding:8px;text-align:left}
+.modes{display:flex;gap:4px;padding:4px 4px 8px}
+.modes button{display:flex;align-items:center;gap:7px;border:0;background:none;color:var(--muted);font:500 14px var(--body);
+  padding:7px 12px;border-radius:10px;cursor:pointer}
+.modes button:hover{color:var(--ink)}
+.modes button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+form.q{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:6px 6px 6px 16px;transition:border-color .15s,box-shadow .15s}
+form.q:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 18%,transparent)}
+form.q .ico{color:var(--muted)}
+form.q input{flex:1;min-width:0;border:0;background:transparent;color:var(--ink);font:500 17px var(--body);padding:10px 0}
+form.q input::placeholder{color:var(--muted);opacity:.8}
 form.q input:focus{outline:none}
-form.q:focus-within{border-bottom-color:var(--accent)}
-.go{flex:none;border:0;border-radius:12px;background:var(--accent);color:var(--accent-ink);
-  font:600 16px var(--body);padding:12px 20px;cursor:pointer;margin-bottom:6px}
-.go:hover{filter:brightness(1.05)}
-.tries{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 0;padding:0;list-style:none}
-.tries button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;
-  font:500 14px var(--body);padding:6px 12px;cursor:pointer}
-.tries button:hover{border-color:var(--ink)}
-
-/* photo mode */
-.drop{display:none;border:2px dashed var(--line);border-radius:16px;background:var(--surface);padding:26px;
-  align-items:center;gap:20px;cursor:pointer;min-height:132px}
+form.q input::-webkit-search-cancel-button{display:none}
+.iconbtn{flex:none;width:42px;height:42px;display:grid;place-items:center;border:0;border-radius:10px;background:none;color:var(--muted);cursor:pointer}
+.iconbtn:hover{background:var(--surface);color:var(--ink)}
+.go{flex:none;display:flex;align-items:center;gap:8px;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);
+  font:600 15px var(--body);padding:11px 20px;cursor:pointer;transition:background .15s}
+.go:hover{background:var(--accent-hover)}
+.drop{display:none;border:1.5px dashed var(--line);border-radius:14px;background:var(--bg);padding:22px;
+  align-items:center;gap:18px;cursor:pointer;min-height:122px;transition:border-color .15s,background .15s}
 .drop.on{display:flex}
-.drop.over{border-color:var(--accent)}
-.drop img{width:96px;height:96px;object-fit:contain;background:var(--photo);border-radius:10px;display:none}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .up{width:52px;height:52px;border-radius:12px;background:var(--surface);border:1px solid var(--line);display:grid;place-items:center;color:var(--accent)}
+.drop img{width:80px;height:80px;object-fit:contain;background:var(--photo);border-radius:10px;border:1px solid var(--line);display:none}
 .drop img.has{display:block}
-.drop strong{font:700 22px/1.2 var(--display);display:block;margin-bottom:4px}
-.drop span{color:var(--muted);font-size:15px}
+.drop img.has + .up{display:none}
+.drop strong{display:block;font-weight:600;font-size:16px;margin-bottom:2px}
+.drop span{color:var(--muted);font-size:14px}
+.searchbox{transition:border-color .15s,box-shadow .15s}
+.searchbox.over{border-color:var(--accent);box-shadow:var(--shadow-lg),0 0 0 4px color-mix(in srgb,var(--accent) 22%,transparent)}
+.samples{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px}
+.samples .hint{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:13px}
+.sample{display:flex;align-items:center;gap:10px;border:1px solid var(--line);background:var(--surface);border-radius:12px;
+  padding:4px 14px 4px 4px;cursor:grab;font:500 13px var(--body);color:var(--ink2);box-shadow:var(--shadow);transition:all .15s}
+.sample:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+.sample:active{cursor:grabbing}
+.sample img{width:46px;height:46px;object-fit:contain;background:#fff;border-radius:8px;pointer-events:none}
+.below{max-width:760px;margin:18px auto 0;display:flex;flex-direction:column;align-items:center;gap:14px}
+.tries{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:0;padding:0;list-style:none}
+.tries button{border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:999px;
+  font:500 13px var(--body);padding:6px 12px;cursor:pointer;transition:border-color .15s,color .15s}
+.tries button:hover{border-color:var(--accent);color:var(--accent)}
+.boot{display:inline-flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);min-height:22px}
+.boot .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex:none;animation:pulse 1s infinite alternate}
+.boot.ready .dot{background:var(--ok);animation:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 20%,transparent)}
+.boot.err{color:var(--danger)} .boot.err .dot{background:var(--danger);animation:none}
+.boot .pbar{width:120px;height:4px;border-radius:4px;background:var(--line);overflow:hidden;flex:none}
+.boot.ready .pbar,.boot.err .pbar{display:none}
+.boot .pbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+@keyframes pulse{to{opacity:.35}}
 
-/* status + results */
-.status{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;margin:30px 0 14px;min-height:28px}
-.status h2{margin:0;font:700 22px/1.25 var(--display);letter-spacing:-.01em}
-.status .speed{color:var(--muted);font-size:15px}
-.status .speed b{color:var(--ink);font-weight:600}
-.source{display:flex;align-items:center;gap:10px}
-.source img{width:40px;height:40px;object-fit:contain;background:var(--photo);border-radius:8px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;padding:0;margin:0;list-style:none}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
-.card .ph{aspect-ratio:1/1;background:var(--photo);display:grid;place-items:center;position:relative}
-.card .ph img{width:86%;height:86%;object-fit:contain}
-.card .ph .rank{position:absolute;top:8px;left:8px;background:var(--ink);color:var(--page);font:600 12px var(--body);
-  border-radius:6px;padding:2px 7px}
-.card .ph .none{font:700 40px var(--display);color:#9AA9A7}
-.card .body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:6px;flex:1}
-.card h3{margin:0;font:600 15px/1.35 var(--body);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.card .brand{color:var(--muted);font-size:13px;line-height:1.3}
-.match{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-top:auto}
-.match .bar{flex:1;height:5px;border-radius:5px;background:var(--line);overflow:hidden}
-.match .bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
-.more{align-self:flex-start;border:0;background:none;padding:2px 0;color:var(--ink);font:600 14px var(--body);
-  text-decoration:underline;text-underline-offset:3px;cursor:pointer}
-.more:hover{color:var(--muted)}
-.msg{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px;color:var(--muted)}
+/* stats strip */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);margin:44px 0 8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.stats div{padding:18px 22px;border-left:1px solid var(--line)}
+.stats div:first-child{border-left:0}
+.stats b{display:block;font:700 26px/1.1 var(--head);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stats span{color:var(--muted);font-size:13px}
+
+/* results */
+.results{scroll-margin-top:80px}
+.status{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:40px 0 16px;min-height:32px}
+.status h2{margin:0;font:600 20px/1.3 var(--head);letter-spacing:-.015em}
+.status .speed{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:13px;background:var(--surface);
+  border:1px solid var(--line);border-radius:999px;padding:4px 12px}
+.status .speed b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.source{display:flex;align-items:center;gap:12px}
+.source img{width:40px;height:40px;object-fit:contain;background:var(--photo);border-radius:8px;border:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(224px,1fr));gap:16px;padding:0;margin:0;list-style:none}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;
+  box-shadow:var(--shadow);transition:transform .18s ease,box-shadow .18s ease,border-color .18s}
+.card:not(.skel):hover{transform:translateY(-3px);box-shadow:var(--shadow-lg);border-color:color-mix(in srgb,var(--accent) 30%,var(--line))}
+.card .ph{aspect-ratio:1/1;background:var(--photo);display:grid;place-items:center;position:relative;border-bottom:1px solid var(--line)}
+.card .ph img{position:absolute;inset:8%;width:84%;height:84%;object-fit:contain;transition:transform .25s ease}
+.card:hover .ph img{transform:scale(1.04)}
+.card .ph .rank{z-index:1;position:absolute;top:10px;left:10px;background:rgba(11,18,32,.78);color:#fff;font:600 11px var(--body);
+  border-radius:6px;padding:2px 7px;backdrop-filter:blur(4px)}
+.card .ph .score{z-index:1;position:absolute;top:10px;right:10px;background:rgba(255,255,255,.92);color:#344054;font:600 11px var(--body);
+  border:1px solid #E4E7EC;border-radius:6px;padding:2px 7px;font-variant-numeric:tabular-nums}
+.card .ph .none{font:700 40px var(--head);color:#98A2B3}
+.card .body{padding:12px 14px 14px;display:flex;flex-direction:column;gap:4px;flex:1}
+.card h3{margin:0;font:500 14px/1.4 var(--body);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .brand{color:var(--muted);font-size:12.5px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.match{display:flex;align-items:center;gap:8px;margin:8px 0 2px}
+.match .bar{flex:1;height:4px;border-radius:4px;background:var(--line);overflow:hidden}
+.match .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),#7C3AED);border-radius:4px}
+.more{margin-top:auto;align-self:stretch;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);
+  background:var(--surface);border-radius:9px;padding:7px 10px;color:var(--ink2);font:500 13px var(--body);cursor:pointer;transition:all .15s}
+.more:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.msg{grid-column:1/-1;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:28px;color:var(--muted);text-align:center}
 .msg.err{color:var(--danger)}
-.skel .ph{background:linear-gradient(90deg,var(--surface),var(--page),var(--surface));background-size:200% 100%;animation:sh 1.2s infinite}
+.skel .ph,.skel .line{background:linear-gradient(90deg,var(--surface),var(--line),var(--surface));background-size:200% 100%;animation:sh 1.2s infinite}
+.skel .line{height:10px;border-radius:5px;margin:4px 0}
 @keyframes sh{to{background-position:-200% 0}}
 
 /* how it works */
-.how{margin:64px 0 0;padding:40px 0 56px;border-top:1px solid var(--line);display:grid;grid-template-columns:1.1fr .9fr;gap:48px}
-.how h2{font:700 28px/1.2 var(--display);letter-spacing:-.015em;margin:0 0 18px}
-.how ol{margin:0;padding:0;list-style:none;counter-reset:s}
-.how li{counter-increment:s;display:grid;grid-template-columns:34px 1fr;gap:12px;margin-bottom:18px;max-width:58ch}
-.how li::before{content:counter(s);width:28px;height:28px;border-radius:50%;border:2px solid var(--ink);
-  display:grid;place-items:center;font:700 14px var(--display)}
-.how li b{display:block}
-.how li span{color:var(--muted)}
-table{border-collapse:collapse;width:100%;font-size:15px;background:var(--surface);border-radius:14px;overflow:hidden;border:1px solid var(--line)}
-th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line)}
-th{font-weight:600;color:var(--muted);font-size:13px}
-td.n{font-variant-numeric:tabular-nums}
-td.up{font-weight:700}
-tr:last-child td{border-bottom:0}
-.note{color:var(--muted);font-size:14px;margin:12px 0 0}
-footer{color:var(--muted);font-size:14px;padding:0 0 32px}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+section.how{margin:88px 0 0;scroll-margin-top:80px}
+.eyebrow{color:var(--accent);font-weight:600;font-size:13px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 8px}
+.how h2,.perf h2{font:700 clamp(26px,3.2vw,34px)/1.15 var(--head);letter-spacing:-.025em;margin:0 0 28px;max-width:22ch}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin:0;padding:0;list-style:none}
+.steps li{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px;box-shadow:var(--shadow)}
+.steps .ic{width:40px;height:40px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;margin-bottom:16px}
+.steps b{display:block;font:600 15px/1.35 var(--head);margin-bottom:6px}
+.steps span{color:var(--muted);font-size:14px;line-height:1.55}
 
-.boot{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted);margin:0 0 18px;min-height:22px}
-.boot .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);flex:none;animation:pulse 1s infinite alternate}
-.boot.ready .dot{background:#2E9E6A;animation:none}
-.boot.err{color:var(--danger)}
-.boot .pbar{width:140px;height:5px;border-radius:5px;background:var(--line);overflow:hidden;flex:none}
-.boot.ready .pbar{display:none}
-.boot .pbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
-@keyframes pulse{to{opacity:.35}}
-@media (max-width:760px){
-  .how{grid-template-columns:1fr;gap:32px}
-  form.q{flex-direction:column;align-items:stretch;border-bottom:0;gap:10px}
-  form.q input{border-bottom:3px solid var(--ink);padding-bottom:8px}
-  .go{margin:0}
-  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-  .top nav a.hide-sm{display:none}
+/* performance */
+.perf{margin:72px 0 0;display:grid;grid-template-columns:.9fr 1.1fr;gap:48px;align-items:start}
+.perf p{color:var(--muted);margin:0 0 14px;max-width:46ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:24px;box-shadow:var(--shadow)}
+.legend{display:flex;gap:16px;font-size:13px;color:var(--muted);margin-bottom:18px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend .b{background:var(--line)} .legend .a{background:var(--accent)}
+.metric{display:grid;grid-template-columns:96px 1fr;gap:4px 16px;align-items:center;margin-bottom:18px}
+.metric > b{font-weight:600;font-size:14px;grid-row:span 2}
+.metric .row{display:flex;align-items:center;gap:10px;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.metric .row .t{flex:1;height:8px;border-radius:4px;background:var(--bg);overflow:hidden}
+.metric .row .t i{display:block;height:100%;border-radius:4px;background:var(--line)}
+.metric .row.after .t i{background:linear-gradient(90deg,var(--accent),#7C3AED)}
+.metric .row.after{color:var(--ink);font-weight:600}
+.metric .row em{font-style:normal;width:44px;text-align:right}
+.live{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding-top:16px;margin-top:4px;font-size:14px}
+.live span:first-child{color:var(--muted)}
+.live b{font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.note{color:var(--muted);font-size:13px;margin:14px 0 0}
+
+footer{margin-top:88px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+footer .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;padding-top:24px;padding-bottom:32px}
+footer nav{display:flex;gap:18px}
+footer a{text-decoration:none} footer a:hover{color:var(--ink)}
+
+@media (max-width:960px){
+  .steps{grid-template-columns:repeat(2,1fr)}
+  .perf{grid-template-columns:1fr;gap:24px}
 }
-@media (prefers-reduced-motion:reduce){.skel .ph,.boot .dot{animation:none}}
+@media (max-width:680px){
+  .wrap{padding:0 16px}
+  .top nav a.hide-sm{display:none}
+  .hero{padding:40px 0 20px}
+  .lede{font-size:15px;margin-bottom:24px}
+  form.q{padding-left:12px}
+  .go span{display:none} .go{padding:11px 13px}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .stats div:nth-child(3){border-left:0}
+  .stats div:nth-child(n+3){border-top:1px solid var(--line)}
+  .stats b{font-size:22px}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .steps{grid-template-columns:1fr}
+  .metric{grid-template-columns:1fr} .metric > b{grid-row:auto}
+}
+@media (prefers-reduced-motion:reduce){
+  .skel .ph,.skel .line,.boot .dot{animation:none}
+  .card,.card .ph img{transition:none} .card:not(.skel):hover{transform:none} .card:hover .ph img{transform:none}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header class="top">
-    <div class="mark"><i aria-hidden="true"></i>ProductLens</div>
+<header class="top">
+  <div class="wrap">
+    <a class="mark" href="./"><span class="logo" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></span>ProductLens</a>
     <nav>
       <a href="#how">How it works</a>
+      <a class="hide-sm" href="#perf">Results</a>
       <a class="hide-sm" href="#" id="model-link" target="_blank" rel="noopener">Model</a>
-      <a href="https://github.com/ranjeet258/ProductLens" target="_blank" rel="noopener">GitHub</a>
+      <a class="gh" href="https://github.com/ranjeet258/ProductLens" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5a11.5 11.5 0 0 0-3.64 22.41c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.52-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.55-.29-5.24-1.28-5.24-5.69 0-1.26.45-2.29 1.19-3.09-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.17 1.18a11 11 0 0 1 5.77 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.8 1.19 1.83 1.19 3.09 0 4.42-2.7 5.39-5.26 5.68.41.36.78 1.06.78 2.14v3.17c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .5Z"/></svg>GitHub</a>
     </nav>
-  </header>
+  </div>
+</header>
 
+<div class="wrap">
   <main>
     <section class="hero">
-      <p class="lede">Describe a product in your own words, or show a photo. The model finds the closest matches among 121,549 real Amazon listings. Everything runs <b>inside your browser</b>: no server, nothing you type or upload leaves your device.</p>
-      <div class="boot" id="boot" role="status"><span class="dot"></span><span id="boot-text">Starting…</span><span class="pbar"><i id="boot-bar"></i></span></div>
+      <span class="badge"><b>On-device</b>No server · nothing you type or upload leaves your browser</span>
+      <h1>Find any product by <em>describing it</em> or showing a photo</h1>
+      <p class="lede">A fine-tuned CLIP model searches 121,549 real Amazon listings in milliseconds, right here in your browser.</p>
 
-      <div class="modes" role="group" aria-label="Search by">
-        <button type="button" id="m-text" aria-pressed="true">Describe it</button>
-        <button type="button" id="m-photo" aria-pressed="false">Use a photo</button>
+      <div class="searchbox">
+        <div class="modes" role="group" aria-label="Search by">
+          <button type="button" id="m-text" aria-pressed="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7V5h16v2M9 19h6M12 5v14"/></svg>Describe it</button>
+          <button type="button" id="m-photo" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>Use a photo</button>
+        </div>
+
+        <form class="q" id="qform" role="search">
+          <svg class="ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <label for="q" class="sr">Describe the product</label>
+          <input id="q" name="q" type="search" autocomplete="off" placeholder="a blue ceramic coffee mug" maxlength="200">
+          <button class="iconbtn" type="button" id="cam" title="Search with a photo" aria-label="Search with a photo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7.5 7H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1h-3.5z"/><circle cx="12" cy="13" r="3.5"/></svg></button>
+          <button class="go" type="submit"><span>Search</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </form>
+
+        <label class="drop" id="drop" tabindex="0">
+          <input type="file" id="file" accept="image/*" hidden>
+          <img id="preview" alt="Your photo">
+          <span class="up" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></span>
+          <div><strong>Drop a product photo here</strong><span>or click to browse. You can also paste an image. JPG or PNG, up to 10 MB.</span></div>
+        </label>
       </div>
 
-      <form class="q" id="qform" role="search">
-        <label for="q" class="sr">Describe the product</label>
-        <input id="q" name="q" type="search" autocomplete="off" placeholder="a blue ceramic coffee mug" maxlength="200">
-        <button class="go" type="submit">Search</button>
-      </form>
-
-      <label class="drop" id="drop" tabindex="0">
-        <input type="file" id="file" accept="image/*" hidden>
-        <img id="preview" alt="Your photo">
-        <div><strong>Drop a product photo here</strong><span>or click to choose one. You can also paste an image. JPG or PNG, up to 10 MB.</span></div>
-      </label>
-
-      <ul class="tries" id="tries" aria-label="Example searches">
-        <li><button type="button">black leather office chair</button></li>
-        <li><button type="button">running shoes for women</button></li>
-        <li><button type="button">wooden bookshelf with five shelves</button></li>
-        <li><button type="button">stainless steel water bottle</button></li>
-        <li><button type="button">phone case for iPhone</button></li>
-        <li><button type="button">rug with geometric pattern</button></li>
-      </ul>
+      <div class="below">
+        <div class="samples" role="group" aria-label="Sample photos">
+          <span class="hint"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11V5.5a1.5 1.5 0 0 1 3 0V10m0-1.5a1.5 1.5 0 0 1 3 0V11m0-1a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-1a6 6 0 0 1-5.2-3L4.6 13.4a1.5 1.5 0 0 1 2.5-1.6L9 14"/></svg>Drag a sample photo into the search box, or click it:</span>
+          <button type="button" class="sample" draggable="true" data-src="samples/shoe.jpg" title="Drag into the search box, or click to search"><img src="samples/shoe.jpg" alt="" width="46" height="46">Running shoe</button>
+          <button type="button" class="sample" draggable="true" data-src="samples/lamp.jpg" title="Drag into the search box, or click to search"><img src="samples/lamp.jpg" alt="" width="46" height="46">Desk lamp</button>
+        </div>
+        <ul class="tries" id="tries" aria-label="Example searches">
+          <li><button type="button">black leather office chair</button></li>
+          <li><button type="button">running shoes for women</button></li>
+          <li><button type="button">wooden bookshelf with five shelves</button></li>
+          <li><button type="button">stainless steel water bottle</button></li>
+          <li><button type="button">phone case for iPhone</button></li>
+          <li><button type="button">rug with geometric pattern</button></li>
+        </ul>
+        <div class="boot" id="boot" role="status"><span class="dot"></span><span id="boot-text">Starting…</span><span class="pbar"><i id="boot-bar"></i></span></div>
+      </div>
     </section>
 
-    <section aria-live="polite">
+    <div class="stats" aria-label="Key figures">
+      <div><b>84.3%</b><span>top-1 accuracy (text → image)</span></div>
+      <div><b>2×</b><span>better than zero-shot CLIP</span></div>
+      <div><b>121,549</b><span>products indexed</span></div>
+      <div><b>0 servers</b><span>runs fully in your browser</span></div>
+    </div>
+
+    <section class="results" aria-live="polite">
       <div class="status" id="status"></div>
       <ul class="grid" id="grid"></ul>
     </section>
 
     <section class="how" id="how">
+      <p class="eyebrow">How it works</p>
+      <h2>From a sentence or a photo to the right product</h2>
+      <ol class="steps">
+        <li><span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 6h7M7.8 7.8l8.4 8.4"/></svg></span><b>Words and photos become vectors</b><span>CLIP maps text and images to 512 numbers in one shared space, so “red sneaker” and a photo of one land close together.</span></li>
+        <li><span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/></svg></span><b>Fine-tuned on Amazon listings</b><span>Contrastive training on 109,395 product photo–title pairs from Amazon Berkeley Objects taught it how products are really described.</span></li>
+        <li><span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg></span><b>A compressed index finds matches</b><span>Every catalog photo is pre-embedded into a FAISS IVF-PQ index of about 7 MB, scanned in milliseconds.</span></li>
+        <li><span class="ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span><b>Everything runs on your device</b><span>INT8-quantized ONNX encoders run in WebAssembly. The same model is also available as a Dockerised FastAPI service.</span></li>
+      </ol>
+    </section>
+
+    <section class="perf" id="perf">
       <div>
-        <h2>How it works</h2>
-        <ol>
-          <li><div><b>Your words or photo become a vector.</b><span>A CLIP model turns text and images into 512 numbers that live in the same space, so "red sneaker" and a photo of one land close together.</span></div></li>
-          <li><div><b>The model was fine-tuned on Amazon listings.</b><span>Trained with a contrastive loss on 109,395 product photo–title pairs from the Amazon Berkeley Objects dataset, so it learned how products are actually described.</span></div></li>
-          <li><div><b>FAISS finds the nearest products.</b><span>Every catalog photo is pre-embedded into a compressed IVF-PQ index. A query is compared against all 121,549 products in milliseconds.</span></div></li>
-          <li><div><b>It all runs in your browser.</b><span>The CLIP encoders are exported to ONNX and quantized to INT8, then run with ONNX Runtime Web (WebAssembly). The IVF-PQ index ships as ~6 MB of plain arrays and is scanned exhaustively in JavaScript. The same model is also served as a Dockerised FastAPI API on AWS EC2.</span></div></li>
-        </ol>
+        <p class="eyebrow">Results</p>
+        <h2>Twice as accurate as off-the-shelf CLIP</h2>
+        <p>Measured on 6,077 products the model never saw during training. Recall@K is how often the exact product you described appears in the top K results.</p>
+        <p>Full numbers, error analysis and the quantization study are in the technical report on GitHub.</p>
       </div>
-      <div>
-        <h2>Results</h2>
-        <table>
-          <caption class="sr">Retrieval accuracy on 6,077 held-out products</caption>
-          <thead><tr><th scope="col">Text → image, held-out test</th><th scope="col">Before fine-tuning</th><th scope="col">After</th></tr></thead>
-          <tbody>
-            <tr><td>Recall@1</td><td class="n">41.6%</td><td class="n up">82.4%</td></tr>
-            <tr><td>Recall@5</td><td class="n">65.8%</td><td class="n up">96.2%</td></tr>
-            <tr><td>Recall@10</td><td class="n">74.2%</td><td class="n up">98.0%</td></tr>
-            <tr><td>API latency, p95 (AWS EC2)</td><td class="n" colspan="2">79 ms on 2 CPU cores</td></tr>
-            <tr><td>Search in this browser</td><td class="n" colspan="2" id="live-ms">measured on your first search</td></tr>
-          </tbody>
-        </table>
-        <p class="note">Recall@1 is how often the exact product described is the first result, measured on 6,077 products the model never saw in training.</p>
+      <div class="panel">
+        <div class="legend"><span><i class="b"></i>Zero-shot CLIP</span><span><i class="a"></i>ProductLens</span></div>
+        <div class="metric"><b>Recall@1</b>
+          <div class="row"><span class="t"><i style="width:41.6%"></i></span><em>41.6%</em></div>
+          <div class="row after"><span class="t"><i style="width:84.3%"></i></span><em>84.3%</em></div></div>
+        <div class="metric"><b>Recall@5</b>
+          <div class="row"><span class="t"><i style="width:65.8%"></i></span><em>65.8%</em></div>
+          <div class="row after"><span class="t"><i style="width:96.7%"></i></span><em>96.7%</em></div></div>
+        <div class="metric"><b>Recall@10</b>
+          <div class="row"><span class="t"><i style="width:74.2%"></i></span><em>74.2%</em></div>
+          <div class="row after"><span class="t"><i style="width:98.2%"></i></span><em>98.2%</em></div></div>
+        <div class="live"><span>Search in this browser</span><b id="live-ms">measured on your first search</b></div>
       </div>
     </section>
   </main>
-
-  <footer>ProductLens. Product data and photos: Amazon Berkeley Objects (CC BY 4.0).</footer>
 </div>
 
+<footer>
+  <div class="wrap">
+    <span>ProductLens · Product data and photos: Amazon Berkeley Objects (CC BY 4.0)</span>
+    <nav><a href="https://github.com/ranjeet258/ProductLens" target="_blank" rel="noopener">GitHub</a><a href="#how">How it works</a><a href="#perf">Results</a></nav>
+  </div>
+</footer>
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js"></script>
 <script>
 /* ---------- in-browser search engine: CLIP (ONNX INT8) + IVF-PQ scan ---------- */
@@ -312,7 +425,7 @@ E.ready = (async () => {
   const model = await fetchBuf(info.model_base + "text.onnx", p => setBoot(`Downloading the text model (${mb} MB, only the first time)… ${Math.round(p * 100)}%`, p));
   setBoot("Starting the model…", 1);
   E.text = await ort.InferenceSession.create(model, {executionProviders: ["wasm"]});
-  setBoot(`Ready. Searching ${ix.n.toLocaleString("en-IN")} products on your device.`, 1, "ready");
+  setBoot(`Ready. Searching ${ix.n.toLocaleString("en-US")} products on your device.`, 1, "ready");
 })().catch(e => { setBoot(e.message || "Could not load the search model.", null, "err"); throw e; });
 
 E.vision = null;
@@ -321,7 +434,7 @@ async function visionSession(){
     const mb = E.info.encoders.vision.int8_mb;
     const buf = await fetchBuf(E.info.model_base + "vision.onnx", p => setBoot(`Downloading the photo model (${mb} MB, only the first time)… ${Math.round(p * 100)}%`, p));
     const s = await ort.InferenceSession.create(buf, {executionProviders: ["wasm"]});
-    setBoot(`Ready. Searching ${E.n.toLocaleString("en-IN")} products on your device.`, 1, "ready");
+    setBoot(`Ready. Searching ${E.n.toLocaleString("en-US")} products on your device.`, 1, "ready");
     return s;
   })().catch(e => { E.vision = null; throw e; });
   return E.vision;
@@ -392,7 +505,7 @@ E.meta = async rows => {
 async function results(hits, t0){
   const metas = await E.meta(hits.map(h => h.row));
   const ms = performance.now() - t0;
-  const live = document.getElementById("live-ms"); if (live) live.textContent = `${Math.round(ms)} ms (model + scan of ${E.n.toLocaleString("en-IN")} products)`;
+  const live = document.getElementById("live-ms"); if (live) live.textContent = `${Math.round(ms)} ms (model + scan of ${E.n.toLocaleString("en-US")} products)`;
   return {latency_ms: ms, items_searched: E.n, results: hits.map((h, i) => {
     const [path, name, category, brand, color] = metas[i];
     return {row: h.row, score: h.score, image_path: path, image_url: E.info.image_base + path, name, category, brand, color};
@@ -415,7 +528,7 @@ const K = 12;
 let mode = "text";
 
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-const fmt = n => n.toLocaleString("en-IN");
+const fmt = n => n.toLocaleString("en-US");
 
 function setMode(m){
   mode = m;
@@ -428,27 +541,28 @@ function setMode(m){
 }
 $("#m-text").onclick = () => setMode("text");
 $("#m-photo").onclick = () => setMode("photo");
+$("#cam").onclick = () => setMode("photo");
 
 function loading(label){
   status.innerHTML = `<h2>${label}</h2>`;
-  grid.innerHTML = Array.from({length: 8}, () => `<li class="card skel"><div class="ph"></div><div class="body"><h3>&nbsp;</h3></div></li>`).join("");
+  grid.innerHTML = Array.from({length: 8}, () => `<li class="card skel" aria-hidden="true"><div class="ph"></div><div class="body"><div class="line"></div><div class="line" style="width:60%"></div></div></li>`).join("");
 }
 
 function render(data, heading){
   const r = data.results || [];
   const top = r.length && r[0].score > 0 ? r[0].score : 1;
-  status.innerHTML = `${heading}<span class="speed">Searched <b>${fmt(data.items_searched || 121549)}</b> products in <b>${Math.round(data.latency_ms)} ms</b></span>`;
+  status.innerHTML = `${heading}<span class="speed"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg><b>${fmt(data.items_searched || 121549)}</b> products in <b>${Math.round(data.latency_ms)} ms</b></span>`;
   if (!r.length){ grid.innerHTML = `<li class="msg">No matches. Try fewer words, or describe the product's type and colour.</li>`; return; }
   grid.innerHTML = r.map((p, i) => `
     <li class="card">
-      <div class="ph"><span class="rank">${i + 1}</span>
+      <div class="ph"><span class="rank">#${i + 1}</span><span class="score" title="Cosine similarity ${p.score}">${p.score.toFixed(2)}</span>
         <img src="${esc(p.image_url)}" alt="${esc(p.name)}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'none',textContent:'${esc((p.name||'?')[0])}'}))">
       </div>
       <div class="body">
         <h3 title="${esc(p.name)}">${esc(p.name)}</h3>
         <div class="brand">${esc(p.brand || p.category)}</div>
-        <div class="match" title="Cosine similarity ${p.score}"><span class="bar"><i style="width:${Math.min(100, Math.max(8, Math.round(100 * Math.max(p.score, 0) / top)))}%"></i></span>${p.score.toFixed(3)}</div>
-        <button class="more" type="button" data-row="${p.row}">More like this</button>
+        <div class="match" title="Match strength relative to the top result"><span class="bar"><i style="width:${Math.min(100, Math.max(8, Math.round(100 * Math.max(p.score, 0) / top)))}%"></i></span></div>
+        <button class="more" type="button" data-row="${p.row}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>More like this</button>
       </div>
     </li>`).join("");
 }
@@ -481,7 +595,7 @@ async function searchPhoto(file){
 
 async function moreLike(row){
   loading("Finding similar products");
-  window.scrollTo({top: $(".hero").offsetTop + $(".hero").offsetHeight - 20, behavior: "smooth"});
+  $(".results").scrollIntoView({behavior: "smooth"});
   try {
     const d = await E.similar(row, K);
     render(d, `<h2 class="source"><img src="${esc(d.source.image_url)}" alt="">Looks like “${esc(d.source.name.slice(0, 60))}”</h2>`);
@@ -492,12 +606,40 @@ $("#qform").onsubmit = e => { e.preventDefault(); searchText(q.value); };
 $("#tries").onclick = e => { const b = e.target.closest("button"); if (b) searchText(b.textContent); };
 grid.onclick = e => { const b = e.target.closest(".more"); if (b) moreLike(+b.dataset.row); };
 
-const drop = $("#drop"), file = $("#file");
+const drop = $("#drop"), file = $("#file"), box = $(".searchbox");
+const SAMPLE = "application/x-productlens-sample";
 file.onchange = () => searchPhoto(file.files[0]);
 drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } };
-["dragenter","dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave","drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", e => searchPhoto(e.dataTransfer.files[0]));
+
+async function searchUrl(url){
+  setMode("photo");
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error();
+    const blob = await res.blob();
+    searchPhoto(new File([blob], url.split("/").pop() || "image", {type: blob.type || "image/jpeg"}));
+  } catch { fail(new Error("Could not load that image. Save it to your device and drop the file instead.")); }
+}
+document.querySelectorAll(".sample").forEach(b => {
+  b.addEventListener("dragstart", e => {
+    e.dataTransfer.setData(SAMPLE, b.dataset.src); e.dataTransfer.setData("text/plain", b.dataset.src);
+    e.dataTransfer.effectAllowed = "copy"; e.dataTransfer.setDragImage(b.querySelector("img"), 23, 23);
+  });
+  b.onclick = () => searchUrl(b.dataset.src);
+});
+
+/* the whole search box accepts a dropped file, a sample, or an image dragged from another page */
+const overOn = on => { box.classList.toggle("over", on); drop.classList.toggle("over", on); };
+["dragenter","dragover"].forEach(t => box.addEventListener(t, e => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; overOn(true); }));
+box.addEventListener("dragleave", e => { if (!box.contains(e.relatedTarget)) overOn(false); });
+box.addEventListener("drop", e => {
+  e.preventDefault(); overOn(false);
+  const dt = e.dataTransfer, sample = dt.getData(SAMPLE);
+  if (sample) return searchUrl(sample);
+  if (dt.files.length) { setMode("photo"); return searchPhoto(dt.files[0]); }
+  const url = (dt.getData("text/uri-list") || "").split(/\r?\n/).find(u => u && !u.startsWith("#"));
+  if (url) return searchUrl(url.trim());
+});
 window.addEventListener("paste", e => {
   const item = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith("image/"));
   if (item) { setMode("photo"); searchPhoto(item.getAsFile()); }

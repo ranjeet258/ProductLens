@@ -1,0 +1,120 @@
+{
+  "threshold": 0.97,
+  "trials": [
+    {
+      "encoder": "text",
+      "config": {
+        "per_channel": false,
+        "op_types_to_quantize": [
+          "MatMul",
+          "Gemm",
+          "Gather"
+        ]
+      },
+      "min_cosine": 0.9094
+    },
+    {
+      "encoder": "text",
+      "config": {
+        "per_channel": true,
+        "op_types_to_quantize": [
+          "MatMul",
+          "Gemm",
+          "Gather"
+        ]
+      },
+      "min_cosine": 0.9185
+    },
+    {
+      "encoder": "text",
+      "config": {
+        "per_channel": true,
+        "op_types_to_quantize": [
+          "MatMul",
+          "Gemm",
+          "Gather"
+        ],
+        "keep_fp32": "transformer/resblocks.0/"
+      },
+      "min_cosine": 0.9976
+    },
+    {
+      "encoder": "vision",
+      "config": {
+        "per_channel": false,
+        "op_types_to_quantize": [
+          "MatMul",
+          "Gemm",
+          "Gather"
+        ]
+      },
+      "min_cosine": 0.996
+    }
+  ],
+  "selected": {
+    "text": {
+      "fp32_mb": 242.4,
+      "int8_mb": 69.9,
+      "fp32_cosine_vs_pytorch": 1.0,
+      "min_cosine_vs_pytorch": 0.9976,
+      "quant": {
+        "per_channel": true,
+        "op_types_to_quantize": [
+          "MatMul",
+          "Gemm",
+          "Gather"
+        ],
+        "keep_fp32": "transformer/resblocks.0/"
+      },
+      "seconds": 54.9
+    },
+    "vision": {
+      "fp32_mb": 335.3,
+      "int8_mb": 91.3,
+      "fp32_cosine_vs_pytorch": 1.0,
+      "min_cosine_vs_pytorch": 0.996,
+      "quant": {
+        "per_channel": false,
+        "op_types_to_quantize": [
+          "MatMul",
+          "Gemm",
+          "Gather"
+        ]
+      },
+      "seconds": 17.6
+    }
+  },
+  "block_study_text": [
+    {
+      "fp32_blocks": [
+        0
+      ],
+      "min_cosine": 0.9976,
+      "int8_mb": 70
+    },
+    {
+      "fp32_blocks": [
+        1
+      ],
+      "min_cosine": 0.895,
+      "int8_mb": 70
+    },
+    {
+      "fp32_blocks": [
+        0,
+        1
+      ],
+      "min_cosine": 0.9978,
+      "int8_mb": 78
+    },
+    {
+      "fp32_blocks": [
+        0,
+        1,
+        2
+      ],
+      "min_cosine": 0.9984,
+      "int8_mb": 86
+    }
+  ]
+}
