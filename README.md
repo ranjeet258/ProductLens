@@ -1,38 +1,21 @@
-# ProductLens
+# ProductLens (OpenCLIP ViT-B/32 | Contrastive fine-tuning on ABO | FAISS IVF-PQ | ONNX INT8 | FastAPI + Browser)
 
-**Multimodal product retrieval with a fine-tuned CLIP model: search 121,549 products by text description or by photo.**
-
-[![Live demo](https://img.shields.io/badge/demo-Hugging%20Face%20Space-FFD21E.svg)](https://huggingface.co/spaces/ranjeet258/ProductLens)
-[![ONNX models](https://img.shields.io/badge/models-ONNX%20INT8-005CED.svg)](https://huggingface.co/ranjeet258/ProductLens-onnx)
-[![Text to image R@1](https://img.shields.io/badge/text%E2%86%92image%20R%401-84.3%25-2E7D32.svg)](#results)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-
-| | |
-|---|---|
-| **Live demo** | [huggingface.co/spaces/ranjeet258/ProductLens](https://huggingface.co/spaces/ranjeet258/ProductLens) |
-| **Models** | [huggingface.co/ranjeet258/ProductLens-onnx](https://huggingface.co/ranjeet258/ProductLens-onnx) |
-| **Dataset** | [Amazon Berkeley Objects](https://amazon-berkeley-objects.s3.amazonaws.com/index.html) (CC BY 4.0) |
+ProductLens finds products in the Amazon Berkeley Objects (ABO) catalog from a text description
+("stainless steel water bottle with bamboo lid") or from a photo. OpenCLIP ViT-B/32 is **contrastively fine-tuned on
+the catalog's own image-title pairs**, which **doubles top-1 retrieval accuracy** over zero-shot CLIP
+(41.6% → 84.3%). All 121,549 products are indexed with FAISS IVF-PQ (7.1 MB) and served two ways:
+a FastAPI service in Docker, and a serverless web app where the INT8 encoder and the index run
+entirely in the browser (ONNX Runtime Web), so queries and photos never leave the device.
 
 > ProductLens is a retrieval system built on a public research dataset. It is not a store: no products are sold and no prices are shown.
 
----
+## Demo
 
-## Overview
+* **Live app:** [huggingface.co/spaces/ranjeet258/ProductLens](https://huggingface.co/spaces/ranjeet258/ProductLens)
+* **ONNX models:** [huggingface.co/ranjeet258/ProductLens-onnx](https://huggingface.co/ranjeet258/ProductLens-onnx)
+* **Dataset:** [Amazon Berkeley Objects](https://amazon-berkeley-objects.s3.amazonaws.com/index.html) (CC BY 4.0)
 
-ProductLens retrieves products from the Amazon Berkeley Objects (ABO) catalog given either a natural-language query (for example, "black leather office chair") or a photograph.
-
-General-purpose CLIP models handle everyday images and captions well, but product listings are a different domain: titles dense with brand names, model numbers and dimensions, and studio photographs on plain backgrounds. ProductLens adapts OpenCLIP ViT-B/32 to this domain with contrastive fine-tuning on the catalog's own image-title pairs, which **doubles top-1 retrieval accuracy** over the zero-shot baseline.
-
-The system is deployed in two forms:
-
-1. **REST API.** A FastAPI service in Docker, backed by a FAISS IVF-PQ index.
-2. **Serverless web app.** A static page in which the INT8-quantized encoder and the compressed index run entirely in the browser through ONNX Runtime Web. Queries and photos never leave the user's device.
-
----
-
-## Results
-
-Evaluated on a held-out test split. The split is made by product, so no product in the test set was seen during training.
+## Results (ABO held-out test split, Recall@K)
 
 | Metric | Zero-shot CLIP | ProductLens |
 |---|---:|---:|
@@ -44,16 +27,14 @@ Evaluated on a held-out test split. The split is made by product, so no product 
 | Image → text Recall@10 | 80.9% | **98.2%** |
 | Mean recall | 64.1 | **92.9** |
 
-Recall@K is the percentage of queries for which the correct product appears in the top K results.
+![Zero-shot vs fine-tuned](docs/figures/zeroshot_vs_finetuned.png)
+![Training curves](docs/figures/training_curves.png)
 
-**Full-catalog retrieval.** The same held-out queries searched against all 121,549 products through the deployed IVF-PQ index:
-
-| Text encoder | Size | Latency (1 CPU thread) | Recall@1 | Recall@10 |
-|---|---:|---:|---:|---:|
-| PyTorch fp32 | 242 MB | 126 ms | 28.2% | 72.3% |
-| ONNX INT8 (browser) | 70 MB | 45 ms | 27.5% | 72.0% |
-
-Exact-item recall drops on the full catalog because ABO lists many variants separately, for example one phone-case design for dozens of phone models, with identical photos. Error analysis shows that 74% of top-1 misses are such near-duplicate variants, and 61% of misses still have the exact item in the top 10. See the [analysis notebook](notebooks/02_results_analysis.ipynb) for details.
+**How the scores are measured.** The split is made **by product**, so no test product was seen in
+training. Recall@K is the percentage of queries whose correct product appears in the top K results,
+reported in both directions (text → image and image → text). Zero-shot and fine-tuned models are
+scored on the same queries by `src/evaluate.py`. Every number in this README comes from the JSON
+files in `results/`.
 
 **Training progression (mean validation recall)**
 
@@ -61,7 +42,24 @@ Exact-item recall drops on the full catalog because ABO lists many variants sepa
 |---:|---:|---:|---:|---:|---:|
 | 63.5 | 89.1 | 91.0 | 92.1 | 93.0 | 93.2 |
 
-**System characteristics**
+### Full-catalog retrieval
+
+The same held-out queries, searched against all 121,549 products through the deployed IVF-PQ index:
+
+| Text encoder | Size | Latency (1 CPU thread) | Recall@1 | Recall@10 |
+|---|---:|---:|---:|---:|
+| PyTorch fp32 | 242 MB | 126 ms | 28.2% | 72.3% |
+| ONNX INT8 (browser) | 70 MB | 45 ms | 27.5% | 72.0% |
+
+![IVF probe sweep](docs/figures/full_catalog_nprobe.png)
+![INT8 vs fp32](docs/figures/quantization.png)
+
+Exact-item recall drops on the full catalog because ABO lists many variants separately (for example,
+one phone-case design for dozens of phone models, with identical photos). **74% of top-1 misses are
+such near-duplicate variants**, and 61% of misses still have the exact item in the top 10. See the
+[analysis notebook](notebooks/02_results_analysis.ipynb).
+
+### System characteristics
 
 | Property | Value |
 |---|---|
@@ -73,82 +71,58 @@ Exact-item recall drops on the full catalog because ABO lists many variants sepa
 | Browser text encoder | 70 MB INT8, cosine 0.997 vs fp32 |
 | Training time (T4) | about 39 minutes per epoch, 5 epochs |
 
----
+## What fine-tuning changes (and why zero-shot CLIP falls short)
 
-## Method
+General-purpose CLIP handles everyday images and captions, but product listings are a different
+domain: titles dense with brand names, model numbers and dimensions, and studio photos on plain
+backgrounds.
 
-### 1. Data preparation
-`scripts/prepare_abo.py` parses the ABO listings, keeps English titles, pairs each title with the product's photographs, and splits the data by product into train, validation and test sets.
-
-### 2. Contrastive fine-tuning
-`src/train.py` fine-tunes OpenCLIP ViT-B/32 (LAION-2B pretrained weights) with a symmetric InfoNCE loss and a learnable temperature.
-
-- Optimizer: AdamW (lr 1e-5, weight decay 0.1, no decay on biases, norms and temperature)
-- Schedule: linear warmup followed by cosine decay
-- Mixed-precision training with gradient clipping
-- In-batch negatives: every other pair in a batch serves as a negative example
-
-### 3. Evaluation
-`src/evaluate.py` reports Recall@1/5/10 in both retrieval directions, comparing the zero-shot and fine-tuned models on the held-out test set.
-
-### 4. Indexing
-`src/build_index.py` embeds every catalog photograph and builds a FAISS IVF-PQ index. Each product is stored as 32 bytes of PQ codes plus a list id, roughly 35 times smaller than the raw float32 vectors.
-
-### 5. Deployment
-- **API:** `serve/app.py` loads the model and index from a local directory or from S3 (via an IAM role, so no credentials are stored on the host) and serves search endpoints from a Docker container.
-- **Browser:** `scripts/export_static.py` exports both encoders to ONNX, applies dynamic INT8 quantization, verifies the result against PyTorch (cosine similarity above 0.97), and flattens the index into binary arrays for client-side search.
-
----
-
-## Architecture
-
-```
- Training (Kaggle GPU)                          Serving
- ---------------------                          -------
- ABO listings + photos                          A) FastAPI in Docker
-   | prepare_abo.py: English titles,               model.pt, index.faiss, meta.parquet
-   | split by product                              local folder or S3 via IAM role
-   v                                               probes 16 of 1,024 lists
- train.py: symmetric InfoNCE,
- learnable temperature                          B) Static site on Hugging Face
-   v                                               export_static.py: encoders -> ONNX -> INT8,
- build_index.py: embed catalog                     IVF-PQ index -> binary arrays
- photos -> FAISS IVF-PQ                            browser: ONNX Runtime Web + JavaScript
- (1024 lists, 32 x 8-bit codes)                    scan of every PQ code
-```
-
-## Implementation notes
-
-- **Exhaustive client-side search.** The browser scores every product with the same asymmetric distance computation FAISS uses (coarse centroid plus PQ lookup tables), across all 1,024 inverted lists.
-- **Similar-item search without an image model.** A product's vector is reconstructed from its PQ code and used directly as the query.
-- **Lazy loading.** The image encoder is downloaded only when a user first searches by photo.
-- **Native tokenizer.** OpenCLIP's byte-level BPE tokenizer is reimplemented in JavaScript and validated against token ids produced in Python during export.
-- **Mixed-precision quantization.** After fine-tuning, the text encoder's first transformer block develops activation outliers that dynamic INT8 quantization cannot represent well (cosine 0.91 against PyTorch). Keeping that single block in fp32 restores a cosine of 0.998 at a cost of about 9 MB.
-
----
-
-## Comparison
-
-| Capability | ProductLens | Zero-shot CLIP | Keyword search |
+| | Zero-shot CLIP | ProductLens | Keyword search |
 |---|---|---|---|
 | Search by photo | Yes | Yes | No |
-| Understands product titles | Yes | Partially | Yes |
+| Understands product titles | Partially | Yes | Yes |
 | Matches without shared words | Yes | Yes | No |
-| Runs without a server | Yes | No | No |
-| Text → image Recall@1 (this catalog) | 84.3% | 41.6% | Not measured |
+| Runs without a server | No | Yes | No |
+| Text → image Recall@1 (this catalog) | 41.6% | **84.3%** | Not measured |
 
----
+## Repository layout
 
-## Getting started
+```
+src/                     core library
+  train.py               contrastive fine-tuning (symmetric InfoNCE, learnable temperature)
+  evaluate.py            Recall@1/5/10, zero-shot vs fine-tuned
+  build_index.py         Flat or IVF-PQ FAISS index, optional S3 upload
+  common.py              model loading, dataset, metrics
+scripts/
+  prepare_abo.py         ABO listings -> image-text pairs, split by product
+  export_static.py       ONNX export, accuracy-gated INT8 quantization, browser index
+  bench_latency.py       p50 / p95 / p99 latency against the running API
+  make_synthetic.py      synthetic catalog for the smoke test
+  publish_static.sh      one-command publish of the browser version
+  kaggle/submit_pipeline.py   submit the full GPU pipeline to Kaggle
+notebooks/
+  01_training_pipeline_kaggle.ipynb   Kaggle T4: prepare -> fine-tune -> evaluate -> index
+  02_results_analysis.ipynb           full-catalog eval, IVF probe sweep, INT8 vs fp32, storage
+results/                 measured metrics (JSON) behind every number in this README
+docs/                    technical report (PDF), build_report.py, figures
+serve/                   FastAPI service and search page
+static/                  browser application and Space configuration
+tests/smoke_test.sh      end-to-end test on a synthetic catalog
+Dockerfile               CPU serving image
+```
 
-### Requirements
-Python 3.10 or later. A single NVIDIA T4 (16 GB) is sufficient for training. Indexing, export and serving run on CPU.
+Local-only folders (git-ignored): `artifacts/` (model, index, metadata), `static_site/` (built browser app), `data/`, `abo/`.
+
+## Reproduce
+
+Python 3.10 or later. A single NVIDIA T4 (16 GB) is enough for training; indexing, export and
+serving run on CPU.
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 1. Download and prepare the data (about 3.5 GB)
+**1. Download and prepare the data (about 3.5 GB).**
 
 ```bash
 mkdir abo && cd abo
@@ -158,7 +132,7 @@ tar xf abo-listings.tar && tar xf abo-images-small.tar && cd ..
 python scripts/prepare_abo.py --abo-root abo --out-dir data --use-other-images
 ```
 
-### 2. Fine-tune and evaluate
+**2. Fine-tune and evaluate.**
 
 ```bash
 python src/train.py --train-csv data/train.csv --val-csv data/val.csv --image-root abo/images/small \
@@ -168,15 +142,14 @@ python src/evaluate.py --test-csv data/test.csv --image-root abo/images/small \
 ```
 
 If the GPU runs out of memory, reduce `--batch-size` or add `--unlocked-image-groups 4`.
-
-No local GPU? Steps 1 to 3 run end to end on a free Kaggle T4:
+No local GPU? Steps 1–3 run end to end on a free Kaggle T4:
 
 ```bash
 pip install kaggle && kaggle auth login
 python scripts/kaggle/submit_pipeline.py --user <kaggle-username>
 ```
 
-### 3. Build the index
+**3. Build the index.**
 
 ```bash
 python src/build_index.py --catalog-csv data/catalog.csv --image-root abo/images/small \
@@ -184,7 +157,7 @@ python src/build_index.py --catalog-csv data/catalog.csv --image-root abo/images
 cp runs/clip_abo/best.pt artifacts/model.pt
 ```
 
-### 4a. Run the API
+**4a. Serve the API.**
 
 ```bash
 docker build -t productlens .
@@ -193,96 +166,71 @@ curl "localhost:8000/search?q=wooden%20coffee%20table&k=5"
 curl -X POST -F "file=@some_product.jpg" "localhost:8000/search_by_image?k=5"
 ```
 
-To load artifacts from S3, set `-e ARTIFACTS_S3_URI=s3://<bucket>/productlens/` and attach an instance role with read access to that prefix.
+To load artifacts from S3, set `-e ARTIFACTS_S3_URI=s3://<bucket>/productlens/` and attach an
+instance role with read access to that prefix.
 
-### 4b. Publish the browser version
+**4b. Publish the browser version.**
 
 ```bash
 export HF_TOKEN=hf_...   # Hugging Face token with write access
 python scripts/export_static.py --artifacts artifacts --out static_site --push <hf-username>
 ```
 
-This creates the model repository `<hf-username>/ProductLens-onnx` and a static Space `<hf-username>/ProductLens`.
+This creates the model repo `<hf-username>/ProductLens-onnx` and a static Space `<hf-username>/ProductLens`.
 
-### Smoke test
-Runs every stage end to end on a synthetic catalog with a randomly initialized model. No GPU and no downloads are required.
+**5. Tests.** Runs every stage on a synthetic catalog with a randomly initialized model; no GPU and no downloads.
 
 ```bash
 bash tests/smoke_test.sh
 ```
 
----
+## Architecture
+![Architecture](docs/figures/architecture.png)
 
-## API reference
+* **Training:** ABO listings → English titles paired with product photos, split by product → OpenCLIP ViT-B/32 (LAION-2B) fine-tuned with symmetric InfoNCE + learnable temperature (AdamW lr 1e-5, weight decay 0.1, warmup + cosine, mixed precision, gradient clipping, in-batch negatives, 5 epochs).
+* **Indexing:** every catalog photo → 512-d embedding → FAISS IVF-PQ (1,024 lists, 32 × 8-bit codes), about 35× smaller than raw float32 vectors.
+* **API:** FastAPI in Docker loads `model.pt`, `index.faiss`, `meta.parquet` from disk or S3 (IAM role, no stored credentials) and probes 16 of 1,024 lists.
+* **Browser:** encoders → ONNX → dynamic INT8, verified against PyTorch (cosine > 0.97); the index is flattened to binary arrays and searched in JavaScript with the same asymmetric distance computation FAISS uses, across all 1,024 lists.
 
-| Method | Endpoint | Description |
+**Implementation notes**
+
+* **Similar-item search without an image model.** A product's vector is reconstructed from its PQ code and used directly as the query.
+* **Lazy loading.** The image encoder is downloaded only when a user first searches by photo.
+* **Native tokenizer.** OpenCLIP's byte-level BPE tokenizer is reimplemented in JavaScript and validated against token ids produced in Python during export.
+* **Mixed-precision quantization.** After fine-tuning, the text encoder's first transformer block develops activation outliers that dynamic INT8 cannot represent well (cosine 0.91 vs PyTorch). Keeping that one block in fp32 restores cosine 0.998 at a cost of about 9 MB.
+
+## API
+
+| Method | Path | Purpose |
 |---|---|---|
-| GET | `/` | Search interface |
-| GET | `/health` | Health check (used by the Docker `HEALTHCHECK`) |
-| GET | `/search?q=<text>&k=10` | Text query; returns the top-k products |
-| POST | `/search_by_image?k=10` | Image upload; returns the top-k products |
-| GET | `/similar` | Products similar to a given product |
-
-## Project structure
-
-```
-ProductLens/
-├── src/                          core library
-│   ├── train.py                  contrastive fine-tuning
-│   ├── evaluate.py               Recall@1/5/10, zero-shot vs fine-tuned
-│   ├── build_index.py            Flat or IVF-PQ FAISS index, optional S3 upload
-│   └── common.py                 model loading, dataset, metrics
-├── scripts/                      pipeline entry points
-│   ├── prepare_abo.py            ABO listings to image-text pairs, split by product
-│   ├── export_static.py          ONNX export, accuracy-gated INT8 quantization, browser index
-│   ├── bench_latency.py          p50 / p95 / p99 latency against the running API
-│   ├── make_synthetic.py         synthetic catalog for the smoke test
-│   ├── publish_static.sh         one-command publish of the browser version
-│   └── kaggle/
-│       └── submit_pipeline.py    submit the full GPU pipeline to Kaggle
-├── notebooks/
-│   ├── 01_training_pipeline_kaggle.ipynb   step-by-step training on a Kaggle T4
-│   └── 02_results_analysis.ipynb           measured analysis, figures and comparisons
-├── results/                      measured metrics (JSON) behind every number in this README
-├── docs/
-│   ├── ProductLens_Technical_Report.pdf    full technical report
-│   ├── build_report.py           rebuilds the report from results/
-│   └── figures/                  charts and architecture diagram
-├── serve/                        FastAPI service and search page
-├── static/                       browser application and Space configuration
-├── tests/smoke_test.sh           end-to-end test on a synthetic catalog
-├── Dockerfile                    CPU serving image
-└── requirements.txt
-```
-
-Local-only folders (git-ignored): `artifacts/` (model, index, metadata), `static_site/` (built browser app), `data/`, `abo/`.
+| GET | `/` | search interface |
+| GET | `/health` | health check (used by the Docker `HEALTHCHECK`) |
+| GET | `/search?q=<text>&k=10` | text query → top-k products |
+| POST | `/search_by_image?k=10` | image upload → top-k products |
+| GET | `/similar` | products similar to a given product |
 
 ## Documentation
 
-- **[Technical report (PDF)](docs/ProductLens_Technical_Report.pdf)**: problem, dataset, architecture, training, evaluation, quantization study, engineering challenges and comparison with alternative techniques.
-- **[Training notebook](notebooks/01_training_pipeline_kaggle.ipynb)**: the full GPU pipeline, step by step.
-- **[Analysis notebook](notebooks/02_results_analysis.ipynb)**: full-catalog evaluation, IVF probe sweep, INT8 vs fp32 encoder, storage footprint.
-
----
+* **[Technical report (PDF)](docs/ProductLens_Technical_Report.pdf):** problem, dataset, architecture, training, evaluation, quantization study, engineering challenges and comparison with alternatives.
+* **[Training notebook](notebooks/01_training_pipeline_kaggle.ipynb):** the full GPU pipeline, step by step.
+* **[Analysis notebook](notebooks/02_results_analysis.ipynb):** full-catalog evaluation, IVF probe sweep, INT8 vs fp32 encoder, storage footprint.
 
 ## Limitations
 
-- The index is built from product photographs, so attributes that are not visible (warranty, battery life, materials) are matched poorly.
-- Only products in the ABO catalog can be retrieved.
-- Near-duplicate variants (same photo, different model or size) limit exact-item recall on the full catalog to 28.2% at rank 1 and 72.3% at rank 10. A text re-ranking stage over the top results is the natural next step.
-- The browser version downloads the text encoder on the first visit. It is cached afterwards.
-- Product images are loaded from the public ABO bucket. If that bucket becomes unavailable, search still works without images.
+* The index is built from product photos, so attributes that are not visible (warranty, battery life, materials) are matched poorly.
+* Only products in the ABO catalog can be retrieved.
+* Near-duplicate variants (same photo, different model or size) limit exact-item recall on the full catalog to 28.2% at rank 1 and 72.3% at rank 10. A text re-ranking stage over the top results is the natural next step.
+* The browser version downloads the text encoder on the first visit; it is cached afterwards.
+* Product images load from the public ABO bucket. If it becomes unavailable, search still works without images.
 
 ## Acknowledgements
 
-- Based on the original multimodal product search project by Mahendra Meena (MIT License).
-- Amazon Berkeley Objects dataset, CC BY 4.0. Collins et al., "ABO: Dataset and Benchmarks for Real-World 3D Object Understanding", CVPR 2022.
-- [OpenCLIP](https://github.com/mlfoundations/open_clip), [FAISS](https://github.com/facebookresearch/faiss) and [ONNX Runtime Web](https://onnxruntime.ai).
+* Based on the original multimodal product search project by Mahendra Meena (MIT License).
+* Amazon Berkeley Objects dataset, CC BY 4.0. Collins et al., "ABO: Dataset and Benchmarks for Real-World 3D Object Understanding", CVPR 2022.
+* [OpenCLIP](https://github.com/mlfoundations/open_clip), [FAISS](https://github.com/facebookresearch/faiss) and [ONNX Runtime Web](https://onnxruntime.ai).
 
 ## License
 
-The code is released under the MIT License; see [LICENSE](LICENSE). The ABO dataset is distributed under its own CC BY 4.0 license.
-
----
+Code: MIT, see [LICENSE](LICENSE). The ABO dataset is distributed under its own CC BY 4.0 license.
 
 Maintained by [Ranjeet Gupta](https://github.com/ranjeet258).
